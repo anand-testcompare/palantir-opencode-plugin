@@ -159,13 +159,14 @@ async function withConcurrencyLimit<T>(
   limit: number
 ): Promise<Array<{ status: 'fulfilled'; value: T } | { status: 'rejected'; reason: Error }>> {
   const results: Array<{ status: 'fulfilled'; value: T } | { status: 'rejected'; reason: Error }> =
-    [];
+    new Array(tasks.length);
   let running = 0;
   let index = 0;
+  let completed = 0;
 
   return new Promise((resolve) => {
     function next(): void {
-      if (results.length === tasks.length) {
+      if (completed === tasks.length) {
         resolve(results);
         return;
       }
@@ -186,6 +187,7 @@ async function withConcurrencyLimit<T>(
           })
           .finally(() => {
             running--;
+            completed++;
             next();
           });
       }
