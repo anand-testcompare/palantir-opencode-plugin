@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { parquetReadObjects } from 'hyparquet';
 
 export type PageRecord = {
   url: string;
@@ -9,93 +9,68 @@ export type PageRecord = {
   fetchedAt: string;
 };
 
-type PageRow = {
-  id: number;
-  url: string;
-  title: string;
-  content: string;
-  word_count: number;
-  meta: string;
-  fetched_at: string;
-};
-
 type PageListing = {
   url: string;
   title: string;
 };
 
-const CREATE_PAGES_TABLE = `
-  CREATE TABLE IF NOT EXISTS pages (
-    id INTEGER PRIMARY KEY,
-    url TEXT UNIQUE NOT NULL,
-    title TEXT,
-    content TEXT,
-    word_count INTEGER,
-    meta TEXT,
-    fetched_at TEXT
-  )
-`;
+export type ParquetStore = {
+  file: ArrayBuffer;
+  index: PageListing[];
+  urlToRow: Map<string, number>;
+};
 
-const UPSERT_PAGE = `
-  INSERT INTO pages (url, title, content, word_count, meta, fetched_at)
-  VALUES ($url, $title, $content, $wordCount, $meta, $fetchedAt)
-  ON CONFLICT(url) DO UPDATE SET
-    title = excluded.title,
-    content = excluded.content,
-    word_count = excluded.word_count,
-    meta = excluded.meta,
-    fetched_at = excluded.fetched_at
-`;
+export async function createDatabase(path: string): Promise<ParquetStore> {
+  const file = await Bun.file(path).arrayBuffer();
 
-export function createDatabase(path: string): Database {
-  const db = new Database(path);
-  db.exec('PRAGMA journal_mode = WAL');
-  db.exec(CREATE_PAGES_TABLE);
-  return db;
+  const rows = await parquetReadObjects({ file, columns: ['url', 'title'] });
+  const index: PageListing[] = [];
+  const urlToRow = new Map<string, number>();
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i] as PageListing;
+    index.push({ url: row.url, title: row.title });
+    urlToRow.set(row.url, i);
+  }
+
+  return { file, index, urlToRow };
 }
 
-export function insertPage(db: Database, page: PageRecord): void {
-  db.query(UPSERT_PAGE).run({
-    $url: page.url,
-    $title: page.title,
-    $content: page.content,
-    $wordCount: page.wordCount,
-    $meta: JSON.stringify(page.meta),
-    $fetchedAt: page.fetchedAt,
-  });
-}
-
-export function insertPages(db: Database, pages: PageRecord[]): void {
-  const insert = db.transaction((batch: PageRecord[]) => {
-    for (const page of batch) {
-      insertPage(db, page);
-    }
-  });
-  insert(pages);
-}
-
-export function getPage(db: Database, url: string): PageRecord | null {
-  const row = db.query<PageRow, [string]>('SELECT * FROM pages WHERE url = ?').get(url);
-
-  if (!row) {
+export async function getPage(store: ParquetStore, url: string): Promise<PageRecord | null> {
+  const rowIndex = store.urlToRow.get(url);
+  if (rowIndex === undefined) {
     return null;
   }
 
+  const rows = await parquetReadObjects({
+    file: store.file,
+    rowStart: rowIndex,
+    rowEnd: rowIndex + 1,
+  });
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const row = rows[0] as Record<string, unknown>;
   return {
-    url: row.url,
-    title: row.title,
-    content: row.content,
-    wordCount: row.word_count,
-    meta: JSON.parse(row.meta) as Record<string, unknown>,
-    fetchedAt: row.fetched_at,
+    url: row.url as string,
+    title: row.title as string,
+    content: row.content as string,
+    wordCount: row.word_count as number,
+    meta: (typeof row.meta === 'string' ? JSON.parse(row.meta) : (row.meta ?? {})) as Record<
+      string,
+      unknown
+    >,
+    fetchedAt: row.fetched_at as string,
   };
 }
 
-export function getAllPages(db: Database): PageListing[] {
-  return db.query<PageListing, []>('SELECT url, title FROM pages').all();
+export function getAllPages(store: ParquetStore): PageListing[] {
+  return store.index;
 }
 
-export function closeDatabase(db: Database): void {
-  db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
-  db.close();
+export function closeDatabase(store: ParquetStore): void {
+  store.index = [];
+  store.urlToRow.clear();
 }
