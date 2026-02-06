@@ -11,7 +11,20 @@ database.
 
 ## Quick start (OpenCode users)
 
-### 1) Install the plugin
+### 1) Enable the plugin in `opencode.json` / `opencode.jsonc`
+
+Add the plugin to your OpenCode config:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@openontology/opencode-palantir@^0.1.1"]
+}
+```
+
+Restart OpenCode.
+
+### 2) (Optional) Install per-project
 
 In your project repo, add the plugin as a dependency inside `.opencode/` (keeps plugin deps separate
 from your app deps):
@@ -30,7 +43,7 @@ EOF
 (cd .opencode && bun install)
 ```
 
-### 2) Load it as an OpenCode plugin
+Then create a tiny wrapper file in `.opencode/plugins/`:
 
 Create a tiny wrapper file in `.opencode/plugins/`:
 
