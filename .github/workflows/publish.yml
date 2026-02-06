@@ -57,8 +57,8 @@ jobs:
             TAG="latest"
           fi
 
-          NAME="$(node -p \"require('./package.json').name\")"
-          VERSION="$(node -p \"require('./package.json').version\")"
+          NAME="$(node -p 'require("./package.json").name')"
+          VERSION="$(node -p 'require("./package.json").version')"
           echo "Checking npm dist-tag '$TAG' for ${NAME}@${VERSION}..."
 
           if ! npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
