@@ -52,6 +52,8 @@ jobs:
 
       - name: Verify published version
         run: |
+          set -euo pipefail
+
           TAG="${{ steps.inputs.outputs.tag }}"
           if [ -z "$TAG" ]; then
             TAG="latest"
@@ -61,15 +63,35 @@ jobs:
           VERSION="$(node -p 'require("./package.json").version')"
           echo "Checking npm dist-tag '$TAG' for ${NAME}@${VERSION}..."
 
-          if ! npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
-            echo "[ERROR] npm does not report ${NAME}@${VERSION} after publish"
-            exit 1
-          fi
+          # npm registry can be eventually consistent right after publish.
+          # Give it a short window to make the new version visible.
+          for i in $(seq 1 20); do
+            if npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
+              break
+            fi
 
-          DIST_VERSION="$(npm view "${NAME}" dist-tags."${TAG}" 2>/dev/null || true)"
-          if [ -n "$DIST_VERSION" ] && [ "$DIST_VERSION" != "$VERSION" ]; then
-            echo "[ERROR] dist-tag '$TAG' points to $DIST_VERSION (expected $VERSION)"
-            exit 1
-          fi
+            if [ "$i" -eq 20 ]; then
+              echo "[ERROR] npm does not report ${NAME}@${VERSION} after publish"
+              exit 1
+            fi
+
+            echo "Waiting for npm to show ${NAME}@${VERSION} (${i}/20)..."
+            sleep 3
+          done
+
+          for i in $(seq 1 20); do
+            DIST_VERSION="$(npm view "${NAME}" dist-tags."${TAG}" 2>/dev/null || true)"
+            if [ -n "$DIST_VERSION" ] && [ "$DIST_VERSION" = "$VERSION" ]; then
+              break
+            fi
+
+            if [ "$i" -eq 20 ]; then
+              echo "[ERROR] dist-tag '$TAG' points to ${DIST_VERSION:-<empty>} (expected $VERSION)"
+              exit 1
+            fi
+
+            echo "Waiting for dist-tag '$TAG' to update (${i}/20)..."
+            sleep 3
+          done
 
           echo "✓ npm publish verification passed"
