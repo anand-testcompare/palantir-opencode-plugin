@@ -19,6 +19,9 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/) specifica
 
 While version is `0.x.x`, breaking changes bump **minor** version.
 
+This repo also intentionally keeps non-breaking `feat:` commits on the same stable line while major
+is `0` (e.g. `0.1.x`).
+
 ### Release Process
 
 1. Push commits to `main` branch
@@ -155,23 +158,12 @@ When you merge a release PR, the GitHub Actions workflow will automatically:
 
 ### Manual Releases
 
-You can also manually trigger a release by pushing a tag in the format `v{semver}`:
+You can manually trigger a publish via GitHub Actions:
 
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
+- Run the `Publish Package` workflow with `tag=next` (prerelease)
+- Run the `Publish Package` workflow with `tag=latest` (stable)
 
-This will:
-
-1. Trigger the release workflow
-2. Build and publish to NPM using trusted publishing
-3. Create a GitHub release
-
-Use manual releases for:
-
-- Hot-fixes outside the normal release cycle
-- Bypassing Release Please when needed
-- Direct version control over releases
+Avoid publishing `latest` manually unless you also intend to cut a matching git tag and GitHub
+Release.
 
 **Learn more:** See the [NPM Trusted Publishing documentation](https://docs.npmjs.com/trusted-publishers) for complete setup and best practices.

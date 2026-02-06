@@ -1,14 +1,82 @@
 # opencode-palantir
 
-OpenCode plugin that provides Palantir Foundry documentation to AI agents via local Parquet storage.
+OpenCode plugin that provides **Palantir Foundry documentation** to AI agents via a local Parquet
+database.
 
 ## Features
 
 - Fetches all ~3,600 pages from Palantir's public documentation
-- Stores in local Parquet file for fast offline access (~17MB)
+- Stores in a local Parquet file for fast offline access (~17MB)
 - Exposes `get_doc_page` and `list_all_docs` tools for AI agents
 
-## Setup
+## Quick start (OpenCode users)
+
+### 1) Install the plugin
+
+In your project repo, add the plugin as a dependency inside `.opencode/` (keeps plugin deps separate
+from your app deps):
+
+```bash
+mkdir -p .opencode
+
+cat > .opencode/package.json <<'EOF'
+{
+  "dependencies": {
+    "@openontology/opencode-palantir": "^0.1.1"
+  }
+}
+EOF
+
+(cd .opencode && bun install)
+```
+
+### 2) Load it as an OpenCode plugin
+
+Create a tiny wrapper file in `.opencode/plugins/`:
+
+```bash
+mkdir -p .opencode/plugins
+
+cat > .opencode/plugins/opencode-palantir.js <<'EOF'
+import plugin from '@openontology/opencode-palantir';
+
+export default plugin;
+EOF
+```
+
+OpenCode automatically loads `.js`/`.ts` files from `.opencode/plugins/` at startup.
+
+> If your OpenCode setup uses an `opencode.json` / `opencode.jsonc` that restricts plugin loading,
+> make sure `.opencode/plugins/` (or the specific plugin file) is included.
+
+### 3) Get `docs.parquet`
+
+This package does **not** ship with docs bundled. You have two options:
+
+#### Option A (recommended): fetch inside OpenCode
+
+In OpenCode, run:
+
+- `/refresh-docs`
+
+This downloads the docs and writes them to `data/docs.parquet` in your project root.
+
+#### Option B: download a prebuilt Parquet file
+
+Download `data/docs.parquet` from this GitHub repo and place it at:
+
+- `<your-project>/data/docs.parquet`
+
+## Using the tools
+
+When installed, this plugin exposes:
+
+- **`get_doc_page`** - Retrieve a specific doc page by URL
+- **`list_all_docs`** - List all available documentation pages
+
+If `data/docs.parquet` is missing, both tools will instruct you to run `/refresh-docs`.
+
+## Setup (this repo)
 
 ```bash
 bun install
@@ -73,23 +141,19 @@ When installed as an OpenCode plugin, exposes:
 - **`list_all_docs`** - List all available documentation pages
 - **`/refresh-docs`** - Command hook to re-fetch all documentation
 
-### Installing in OpenCode (this project only)
+### Installing in OpenCode (this repo only)
 
-Create a tiny wrapper plugin file that re-exports the built artifact into the project-level auto-discovered plugins directory:
+For local development against `dist/`, you can point the wrapper at the built artifact:
 
 ```bash
 mkdir -p .opencode/plugins
-```
 
-```bash
 cat > .opencode/plugins/opencode-palantir.js <<'EOF'
 import plugin from '../../dist/index.js';
 
 export default plugin;
 EOF
 ```
-
-OpenCode automatically loads any `.js`/`.ts` files in `.opencode/plugins/` at startup.
 
 ## Development
 
@@ -122,6 +186,10 @@ Format with Prettier:
 ```bash
 mise run format
 ```
+
+## Release notes
+
+For maintainers, see `RELEASING.md`.
 
 ## Author
 
