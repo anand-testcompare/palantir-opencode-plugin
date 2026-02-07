@@ -97,4 +97,18 @@ jobs:
             sleep 3
           done
 
+          # Extra sanity checks: confirm the publish has provenance attached and looks like an OIDC publish.
+          # These are best-effort signals (npm UI can lag), but they help catch accidental token-based publishes.
+          NPM_USER="$(npm view "${NAME}@${VERSION}" _npmUser 2>/dev/null || true)"
+          if ! echo "$NPM_USER" | grep -q "npm-oidc-no-reply@github.com"; then
+            echo "[ERROR] expected OIDC publish; npm reports _npmUser='${NPM_USER:-<empty>}'"
+            exit 1
+          fi
+
+          PREDICATE_TYPE="$(npm view "${NAME}@${VERSION}" dist.attestations.provenance.predicateType 2>/dev/null || true)"
+          if [ "$PREDICATE_TYPE" != "https://slsa.dev/provenance/v1" ]; then
+            echo "[ERROR] missing/incorrect provenance attestation predicateType: '${PREDICATE_TYPE:-<empty>}'"
+            exit 1
+          fi
+
           echo "✓ npm publish verification passed"
